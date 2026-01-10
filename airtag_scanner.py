@@ -6,6 +6,7 @@ import argparse
 import sys
 from datetime import datetime
 from termcolor import colored
+from tabulate import tabulate
 
 # AirTag detection constants
 APPLE_COMPANY_ID = 0x004c
@@ -74,6 +75,9 @@ def main():
     log_print("Starting AirTag detection with Ubertooth One...")
     log_print("Press Ctrl+C to stop\n")
 
+    # Dictionary to store detected AirTags: {mac_address: {battery, rssi, time}}
+    detected_airtags = {}
+
     process = subprocess.Popen(
         ['ubertooth-btle', '-n'],
         stdout=subprocess.PIPE,
@@ -141,17 +145,32 @@ def main():
                         log_print(f"  Status Byte: 0x{status:02x}", end="")
 
                         # Decode battery status
-                        battery = {
+                        battery_text = {
+                            0x10: "Full",
+                            0x50: "Medium",
+                            0x90: "Low",
+                            0xd0: "Very Low"
+                        }.get(status, "Unknown")
+
+                        battery_colored = {
                             0x10: colored("Full","green"),
                             0x50: colored("Medium","yellow"),
                             0x90: colored("Low","light_red"),
                             0xd0: colored("Very Low","red")
                         }.get(status, "Unknown")
 
-                        log_print(f" (Battery: {battery})")
-                        log_print(f"  RSSI: {current_packet.get('rssi', 'N/A')} dBm")
+                        log_print(f" (Battery: {battery_colored})")
+                        rssi = current_packet.get('rssi', 'N/A')
+                        log_print(f"  RSSI: {rssi} dBm")
                         log_print(f"  Full Payload: {' '.join(hex_bytes)}")
                         log_print()
+
+                        # Save or update AirTag information
+                        detected_airtags[mac] = {
+                            'battery': battery_text,
+                            'rssi': rssi,
+                            'time': timestamp
+                        }
 
                 in_apple_packet = False
 
@@ -160,6 +179,30 @@ def main():
         process.terminate()
         process.wait()
         log_print("Scan stopped.")
+
+        # Display summary table of detected AirTags
+        if detected_airtags:
+            log_print("\n" + "="*70)
+            log_print("DETECTED AIRTAGS SUMMARY")
+            log_print("="*70 + "\n")
+
+            # Prepare table data
+            table_data = []
+            for mac, info in detected_airtags.items():
+                table_data.append([
+                    mac,
+                    info['battery'],
+                    info['rssi'],
+                    info['time']
+                ])
+
+            # Print table
+            headers = ["MAC Address", "Battery", "RSSI (dBm)", "Last Seen"]
+            table = tabulate(table_data, headers=headers, tablefmt="grid")
+            log_print(table)
+            log_print(f"\nTotal unique AirTags detected: {len(detected_airtags)}\n")
+        else:
+            log_print("\nNo AirTags detected during this scan.\n")
 
     except Exception as e:
         log_print(f"Error: {e}")
