@@ -55,6 +55,8 @@ def main():
     parser = argparse.ArgumentParser(description='AirTag Scanner using Ubertooth One')
     parser.add_argument('--log', nargs='?', const='', default=None,
                         help='Enable logging to file. Optionally specify filename, otherwise uses timestamp')
+    parser.add_argument('--found', nargs='?', const='', default=None,
+                        help='Save found AirTags table to file. Optionally specify filename, otherwise uses timestamp')
     args = parser.parse_args()
 
     # Setup logging if requested
@@ -71,6 +73,16 @@ def main():
         except Exception as e:
             print(f"Warning: Could not open log file {log_filename}: {e}")
             log_file = None
+
+    # Setup found file if requested
+    found_filename = None
+    if args.found is not None:
+        if args.found == '':
+            # Generate timestamp-based filename
+            found_filename = datetime.now().strftime('%Y_%m_%d-%H_%M-airtag_scanner_found.txt')
+        else:
+            found_filename = args.found
+        print(f"Found AirTags will be saved to: {found_filename}")
 
     log_print("Starting AirTag detection with Ubertooth One...")
     log_print("Press Ctrl+C to stop\n")
@@ -201,6 +213,19 @@ def main():
             table = tabulate(table_data, headers=headers, tablefmt="grid")
             log_print(table)
             log_print(f"\nTotal unique AirTags detected: {len(detected_airtags)}\n")
+
+            # Save to found file if requested
+            if found_filename:
+                try:
+                    with open(found_filename, 'w') as f:
+                        f.write("="*70 + "\n")
+                        f.write("DETECTED AIRTAGS SUMMARY\n")
+                        f.write("="*70 + "\n\n")
+                        f.write(table + "\n")
+                        f.write(f"\nTotal unique AirTags detected: {len(detected_airtags)}\n")
+                    log_print(f"Found AirTags saved to: {found_filename}")
+                except Exception as e:
+                    log_print(f"Error saving found file: {e}")
         else:
             log_print("\nNo AirTags detected during this scan.\n")
 
