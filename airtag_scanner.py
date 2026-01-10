@@ -2,6 +2,8 @@
 
 import subprocess
 import re
+import argparse
+import sys
 from datetime import datetime
 from termcolor import colored
 
@@ -9,6 +11,24 @@ from termcolor import colored
 APPLE_COMPANY_ID = 0x004c
 FINDMY_DATA = bytes([0x12, 0x19])
 AIR_TAG_STATUSES = bytes([0x10, 0x50, 0x90, 0xd0])
+
+# Global logger instance
+log_file = None
+
+def log_print(*args, **kwargs):
+    """Print to stdout and optionally to log file."""
+    # Print to stdout
+    print(*args, **kwargs)
+
+    # Also write to log file if enabled
+    if log_file:
+        # Capture the print output
+        import io
+        buffer = io.StringIO()
+        print(*args, **kwargs, file=buffer)
+        output = buffer.getvalue()
+        log_file.write(output)
+        log_file.flush()
 
 def check_airtag(data_bytes):
     """
@@ -28,8 +48,31 @@ def check_airtag(data_bytes):
     return False, None
 
 def main():
-    print("Starting AirTag detection with Ubertooth One...")
-    print("Press Ctrl+C to stop\n")
+    global log_file
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='AirTag Scanner using Ubertooth One')
+    parser.add_argument('--log', nargs='?', const='', default=None,
+                        help='Enable logging to file. Optionally specify filename, otherwise uses timestamp')
+    args = parser.parse_args()
+
+    # Setup logging if requested
+    if args.log is not None:
+        if args.log == '':
+            # Generate timestamp-based filename
+            log_filename = datetime.now().strftime('%Y_%m_%d_%H-%M_airtag_scanner.log')
+        else:
+            log_filename = args.log
+
+        try:
+            log_file = open(log_filename, 'w')
+            print(f"Logging to: {log_filename}")
+        except Exception as e:
+            print(f"Warning: Could not open log file {log_filename}: {e}")
+            log_file = None
+
+    log_print("Starting AirTag detection with Ubertooth One...")
+    log_print("Press Ctrl+C to stop\n")
 
     process = subprocess.Popen(
         ['ubertooth-btle', '-n'],
@@ -84,18 +127,18 @@ def main():
 
                     if is_airtag:
                         timestamp = datetime.now().strftime('%H:%M:%S')
-                        print(f"[{timestamp}] AirTag Detected!")
+                        log_print(f"[{timestamp}] AirTag Detected!")
 
                         # Print MAC address
                         mac = current_packet.get('mac', 'Unknown')
                         mac_type = current_packet.get('mac_type', '')
                         if mac_type:
                             pm = colored(f"{mac}", "yellow")
-                            print(f"  MAC Address: {pm} ({mac_type})")
+                            log_print(f"  MAC Address: {pm} ({mac_type})")
                         else:
-                            print(f"  MAC Address: {pm}")
+                            log_print(f"  MAC Address: {pm}")
 
-                        print(f"  Status Byte: 0x{status:02x}", end="")
+                        log_print(f"  Status Byte: 0x{status:02x}", end="")
 
                         # Decode battery status
                         battery = {
@@ -105,22 +148,27 @@ def main():
                             0xd0: colored("Very Low","red")
                         }.get(status, "Unknown")
 
-                        print(f" (Battery: {battery})")
-                        print(f"  RSSI: {current_packet.get('rssi', 'N/A')} dBm")
-                        print(f"  Full Payload: {' '.join(hex_bytes)}")
-                        print()
+                        log_print(f" (Battery: {battery})")
+                        log_print(f"  RSSI: {current_packet.get('rssi', 'N/A')} dBm")
+                        log_print(f"  Full Payload: {' '.join(hex_bytes)}")
+                        log_print()
 
                 in_apple_packet = False
 
     except KeyboardInterrupt:
-        print("\n\nStopping scan...")
+        log_print("\n\nStopping scan...")
         process.terminate()
         process.wait()
-        print("Scan stopped.")
+        log_print("Scan stopped.")
 
     except Exception as e:
-        print(f"Error: {e}")
+        log_print(f"Error: {e}")
         process.terminate()
+
+    finally:
+        # Close log file if it was opened
+        if log_file:
+            log_file.close()
 
 if __name__ == "__main__":
     main()
