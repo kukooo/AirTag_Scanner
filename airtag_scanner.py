@@ -63,7 +63,7 @@ def main():
     if args.log is not None:
         if args.log == '':
             # Generate timestamp-based filename
-            log_filename = datetime.now().strftime('%Y_%m_%d_%H-%M_airtag_scanner.log')
+            log_filename = datetime.now().strftime('%Y_%m_%d-%H_%M-airtag_scanner.log')
         else:
             log_filename = args.log
 
@@ -79,7 +79,7 @@ def main():
     if args.found is not None:
         if args.found == '':
             # Generate timestamp-based filename
-            found_filename = datetime.now().strftime('%Y_%m_%d-%H_%M-airtag_scanner_found.txt')
+            found_filename = datetime.now().strftime('%Y_%m_%d-%H_%M-airtag_found.txt')
         else:
             found_filename = args.found
         print(f"Found AirTags will be saved to: {found_filename}")
