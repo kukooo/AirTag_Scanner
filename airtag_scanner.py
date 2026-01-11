@@ -16,6 +16,11 @@ AIR_TAG_STATUSES = bytes([0x10, 0x50, 0x90, 0xd0])
 # Global logger instance
 log_file = None
 
+def strip_ansi_codes(text):
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
 def log_print(*args, **kwargs):
     """Print to stdout and optionally to log file."""
     # Print to stdout
@@ -28,6 +33,8 @@ def log_print(*args, **kwargs):
         buffer = io.StringIO()
         print(*args, **kwargs, file=buffer)
         output = buffer.getvalue()
+        # Strip ANSI color codes before writing to log file
+        output = strip_ansi_codes(output)
         log_file.write(output)
         log_file.flush()
 
@@ -147,12 +154,12 @@ def main():
 
                         # Print MAC address
                         mac = current_packet.get('mac', 'Unknown')
+                        mac_colored = colored(f"{mac}", "yellow")
                         mac_type = current_packet.get('mac_type', '')
                         if mac_type:
-                            pm = colored(f"{mac}", "yellow")
-                            log_print(f"  MAC Address: {pm} ({mac_type})")
+                            log_print(f"  MAC Address: {mac_colored} ({mac_type})")
                         else:
-                            log_print(f"  MAC Address: {pm}")
+                            log_print(f"  MAC Address: {mac_colored}")
 
                         log_print(f"  Status Byte: 0x{status:02x}", end="")
 
